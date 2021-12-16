@@ -203,6 +203,21 @@ def icp(point_cloud_A, point_cloud_B, num_iterations=50, t_init=None, R_init=Non
 
     return t, R
 
+import pygicp
+def perfect_model_gicp(pcB, pcA, visualize=False):
+    matrix = pygicp.align_points(pcA, pcB)
+    t = matrix[:3,3]
+    R = matrix[:3,:3]
+    transformed_point_B = transform_point_cloud(pcB, t, R)
+    correspondences = find_closest_points(pcA, transformed_point_B)
+    error = compute_transform_error(pcA[:,:3], transformed_point_B[correspondences])
+    print('Infered Position: ', t)
+    print('Infered Orientation:', R)
+    if error < 0.01:
+        return True
+    else:
+        return False
+
 def perfect_model_icp(pcB, pcA, visualize=True):
     # Load the model
     # pcB = load_point_cloud(os.path.join(path_to_pointcloud_files, 'michigan_M_med.ply'))  # Model
@@ -218,7 +233,7 @@ def perfect_model_icp(pcB, pcA, visualize=True):
     t_init = np.mean(pcA[:, :3], axis=0)
 
     # ICP -----
-    t, R = icp(pcA, pcB, num_iterations=70, t_init=t_init, R_init=R_init, visualize=visualize)
+    t, R = icp(pcA, pcB, num_iterations=50, t_init=t_init, R_init=R_init, visualize=visualize)
     transformed_point_B = transform_point_cloud(pcB, t, R)
     correspondences = find_closest_points(pcA, transformed_point_B)
     error = compute_transform_error(pcA[:,:3], transformed_point_B[correspondences])
@@ -234,7 +249,7 @@ def perfect_model_icp(pcB, pcA, visualize=True):
 if __name__ == '__main__':
     # we have all the models ./models folder
     model_dir = './models'
-
+    is_simple = False
     models = [os.path.splitext(filename)[0] for filename in os.listdir(model_dir)]
     model_list = []
     for model in models:     
@@ -242,7 +257,7 @@ if __name__ == '__main__':
     num_models = len(model_list)
     correct_count = 0
     sample_count = 0
-    for k in range(2):
+    for k in range(10):
         # select a random number between 2 and num_models
         num_objects = np.random.randint(2, num_models+1)
         sample_count+=num_objects
@@ -254,7 +269,7 @@ if __name__ == '__main__':
 
         # the sample list contains the sample of objects,
         # we then transform it to different places
-        trans, ori = generate_random_transform(sample_list, is_simple=False)
+        trans, ori = generate_random_transform(sample_list, is_simple=is_simple)
         for i in range(num_objects):
             transformed_pc = transform_point_cloud(sample_list[i], trans[i,:], quaternion_matrix(ori[i,:]))
             transformed_samples.append(transformed_pc)
