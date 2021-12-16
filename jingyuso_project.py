@@ -240,38 +240,41 @@ if __name__ == '__main__':
     for model in models:     
         model_list.append(np.load(os.path.join(model_dir, f'{model}.npy')))
     num_models = len(model_list)
+    correct_count = 0
+    sample_count = 0
+    for k in range(2):
+        # select a random number between 2 and num_models
+        num_objects = np.random.randint(2, num_models+1)
+        sample_count+=num_objects
+        sample_list = model_list
+        random.shuffle(sample_list)
+        sample_list = sample_list[:num_objects]
+        transformed_samples = []
+        transformed_samples_pcd = []
 
-    # select a random number between 2 and num_models
-    num_objects = np.random.randint(2, num_models+1)
-    sample_list = model_list
-    random.shuffle(sample_list)
-    sample_list = sample_list[:num_objects]
-    transformed_samples = []
-    transformed_samples_pcd = []
+        # the sample list contains the sample of objects,
+        # we then transform it to different places
+        trans, ori = generate_random_transform(sample_list, is_simple=False)
+        for i in range(num_objects):
+            transformed_pc = transform_point_cloud(sample_list[i], trans[i,:], quaternion_matrix(ori[i,:]))
+            transformed_samples.append(transformed_pc)
+            transformed_samples_pcd.append(xyz_to_pcd(transformed_pc))
+        # o3d.visualization.draw_geometries(transformed_samples_pcd)
 
-    # the sample list contains the sample of objects,
-    # we then transform it to different places
-    trans, ori = generate_random_transform(sample_list, is_simple=False)
-    for i in range(num_objects):
-        transformed_pc = transform_point_cloud(sample_list[i], trans[i,:], quaternion_matrix(ori[i,:]))
-        transformed_samples.append(transformed_pc)
-        transformed_samples_pcd.append(xyz_to_pcd(transformed_pc))
-    o3d.visualization.draw_geometries(transformed_samples_pcd)
-
-    transformed_pc_arr = np.array(transformed_samples).reshape(-1,3)
-    kmeans = cluster.KMeans(n_clusters=num_objects).fit(transformed_pc_arr)
-    count = 0
-    for i in range(num_objects):
-        t_gt = trans[i,:]
-        o_gt = ori[i,:]
-        pcA = transformed_pc_arr[kmeans.labels_==i]
-        print('\tReal Position: ', t_gt)
-        print('\tReal Orientation:', o_gt)
-        for j in range(num_models):
-            pcB = model_list[j]
-            if perfect_model_icp(pcB, pcA, visualize=False):
-                count += 1
-    print(f'correct {count} times in total {num_objects}')
+        transformed_pc_arr = np.array(transformed_samples).reshape(-1,3)
+        kmeans = cluster.KMeans(n_clusters=num_objects).fit(transformed_pc_arr)
+        # count = 0
+        for i in range(num_objects):
+            t_gt = trans[i,:]
+            o_gt = ori[i,:]
+            pcA = transformed_pc_arr[kmeans.labels_==i]
+            print('\tReal Position: ', t_gt)
+            print('\tReal Orientation:', o_gt)
+            for j in range(num_models):
+                pcB = model_list[j]
+                if perfect_model_icp(pcB, pcA, visualize=False):
+                    correct_count += 1
+    print(f'correct {correct_count} times in total {sample_count}')
             
 
 
